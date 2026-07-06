@@ -12,4 +12,5 @@ class Transactions extends Table {
   IntColumn get installmentGroupId => integer().nullable()();
   IntColumn get installmentNumber => integer().nullable()();
   IntColumn get totalInstallments => integer().nullable()();
+  BoolColumn get isRecurring => boolean().withDefault(const Constant(false))();
 }

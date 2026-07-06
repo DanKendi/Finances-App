@@ -19,14 +19,16 @@ class TransactionDao extends DatabaseAccessor<AppDatabase> with _$TransactionDao
 
   // Busca transações de um mês/ano específico
   Stream<List<Transaction>> watchTransactionsByMonth(int month, int year) {
-    final startDate = DateTime(year, month, 1);
-    final endDate = DateTime(year, month + 1, 1);
+  final startDate = DateTime(year, month, 1);
+  final endDate = DateTime(year, month + 1, 1);
 
-    return (select(transactions)
-          ..where((t) => t.date.isBetweenValues(startDate, endDate))
-          ..orderBy([(t) => OrderingTerm.desc(t.date)]))
-        .watch();
-  }
+  return (select(transactions)
+        ..where((t) =>
+            t.date.isBiggerOrEqualValue(startDate) &
+            t.date.isSmallerThanValue(endDate))
+        ..orderBy([(t) => OrderingTerm.desc(t.date)]))
+      .watch();
+}
 
   Future<int> insertTransaction(TransactionsCompanion transaction) =>
       into(transactions).insert(transaction);
@@ -68,10 +70,71 @@ class TransactionDao extends DatabaseAccessor<AppDatabase> with _$TransactionDao
   }
 
   Future<void> deleteTransactionById(int id) async {
-  await (delete(transactions)..where((t) => t.id.equals(id))).go();
+    await (delete(transactions)..where((t) => t.id.equals(id))).go();
+    }
+
+    Future<void> updateTransactionById({
+      required int id,
+      required String description,
+      required double amount,
+      required DateTime date,
+      required int categoryId,
+      required String paymentMethod,
+    }) async {
+      await (update(transactions)..where((t) => t.id.equals(id))).write(
+        TransactionsCompanion(
+          description: Value(description),
+          amount: Value(amount),
+          date: Value(date),
+          categoryId: Value(categoryId),
+          paymentMethod: Value(paymentMethod),
+        ),
+      );
+    }
+
+    Future<List<Transaction>> getAllTransactions() =>
+      (select(transactions)..orderBy([(t) => OrderingTerm.desc(t.date)])).get();
+
+    Future<Transaction?> getTransactionById(int id) =>
+      (select(transactions)..where((t) => t.id.equals(id))).getSingleOrNull();
+
+    Future<void> insertRecurringTransaction({
+    required String description,
+    required double amount,
+    required DateTime startDate,
+    required int months,
+    required int categoryId,
+    required String paymentMethod,
+    required bool isExpense,
+  }) async {
+    final groupId = DateTime.now().millisecondsSinceEpoch;
+
+    for (int i = 0; i < months; i++) {
+      final date = DateTime(
+        startDate.year,
+        startDate.month + i,
+        startDate.day,
+      );
+
+      await into(transactions).insert(
+        TransactionsCompanion.insert(
+          description: '$description (recorrente ${i + 1}/$months)',
+          amount: amount,
+          date: date,
+          isExpense: Value(isExpense),
+          categoryId: categoryId,
+          paymentMethod: Value(paymentMethod),
+          installmentGroupId: Value(groupId),
+          installmentNumber: Value(i + 1),
+          totalInstallments: Value(months),
+          isRecurring: const Value(true),
+        ),
+      );
+    }
   }
 
-  Future<void> updateTransactionById({
+  // Atualiza apenas esta transação recorrente
+  Future<void> updateSingleRecurring({
     required int id,
     required String description,
     required double amount,
@@ -90,9 +153,39 @@ class TransactionDao extends DatabaseAccessor<AppDatabase> with _$TransactionDao
     );
   }
 
-  Future<List<Transaction>> getAllTransactions() =>
-    (select(transactions)..orderBy([(t) => OrderingTerm.desc(t.date)])).get();
+  // Atualiza esta e todas as subsequentes do mesmo grupo
+  Future<void> updateSubsequentRecurring({
+    required int groupId,
+    required int fromInstallmentNumber,
+    required String baseDescription,
+    required double amount,
+    required int categoryId,
+    required String paymentMethod,
+  }) async {
+    // Busca todas as subsequentes
+    final subsequent = await (select(transactions)
+          ..where((t) =>
+              t.installmentGroupId.equals(groupId) &
+              t.installmentNumber.isBiggerOrEqualValue(fromInstallmentNumber))
+          ..orderBy([(t) => OrderingTerm.asc(t.installmentNumber)]))
+        .get();
 
-  Future<Transaction?> getTransactionById(int id) =>
-    (select(transactions)..where((t) => t.id.equals(id))).getSingleOrNull();
+    // Extrai o padrão da descrição (remove o sufixo recorrente)
+    final totalInstallments = subsequent.isNotEmpty
+        ? subsequent.first.totalInstallments ?? subsequent.length
+        : subsequent.length;
+
+    for (final t in subsequent) {
+      final newDescription =
+          '${baseDescription} (recorrente ${t.installmentNumber}/$totalInstallments)';
+      await (update(transactions)..where((t2) => t2.id.equals(t.id))).write(
+        TransactionsCompanion(
+          description: Value(newDescription),
+          amount: Value(amount),
+          categoryId: Value(categoryId),
+          paymentMethod: Value(paymentMethod),
+        ),
+      );
+    }
+  }
 }

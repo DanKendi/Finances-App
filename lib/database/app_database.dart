@@ -19,15 +19,21 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+    
 
   @override
-  MigrationStrategy get migration => MigrationStrategy(
-        onCreate: (m) async {
-          await m.createAll();
-          await _insertDefaultCategories();
-        },
-      );
+    MigrationStrategy get migration => MigrationStrategy(
+      onCreate: (m) async {
+        await m.createAll();
+        await _insertDefaultCategories();
+      },
+      onUpgrade: (m, from, to) async {
+        if (from < 2) {
+          await m.addColumn(transactions, transactions.isRecurring);
+        }
+      },
+  );
 
   Future<void> _insertDefaultCategories() async {
     final defaults = [

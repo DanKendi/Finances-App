@@ -30,7 +30,15 @@ class _EditTransactionScreenState
   void initState() {
     super.initState();
     final t = widget.transaction;
-    _descriptionController = TextEditingController(text: t.description);
+
+    // Remove o sufixo "(recorrente X/Y)" para exibir só a descrição base
+    String displayDescription = t.description;
+    if (t.isRecurring) {
+      displayDescription =
+          t.description.replaceAll(RegExp(r'\s*\(recorrente \d+/\d+\)'), '');
+    }
+
+    _descriptionController = TextEditingController(text: displayDescription);
     _amountController =
         TextEditingController(text: t.amount.toStringAsFixed(2));
     _selectedDate = t.date;
@@ -55,21 +63,74 @@ class _EditTransactionScreenState
     if (picked != null) setState(() => _selectedDate = picked);
   }
 
+  // Diálogo de escolha para recorrentes
+  Future<String?> _showRecurringEditDialog() async {
+    return showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Editar evento recorrente'),
+        content: const Text('O que você deseja alterar?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, null),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'single'),
+            child: const Text('Apenas este'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, 'subsequent'),
+            child: const Text('Este e os seguintes'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
     final db = ref.read(databaseProvider);
     final amount =
         double.parse(_amountController.text.replaceAll(',', '.'));
+    final t = widget.transaction;
 
-    await db.transactionDao.updateTransactionById(
-      id: widget.transaction.id,
-      description: _descriptionController.text,
-      amount: amount,
-      date: _selectedDate,
-      categoryId: _selectedCategoryId,
-      paymentMethod: _paymentMethod,
-    );
+    if (t.isRecurring) {
+      // Mostra diálogo de escolha
+      final choice = await _showRecurringEditDialog();
+      if (choice == null) return;
+
+      if (choice == 'single') {
+        await db.transactionDao.updateSingleRecurring(
+          id: t.id,
+          description: _descriptionController.text,
+          amount: amount,
+          date: _selectedDate,
+          categoryId: _selectedCategoryId,
+          paymentMethod: _paymentMethod,
+        );
+      } else {
+        await db.transactionDao.updateSubsequentRecurring(
+          groupId: t.installmentGroupId!,
+          fromInstallmentNumber: t.installmentNumber!,
+          baseDescription: _descriptionController.text,
+          amount: amount,
+          categoryId: _selectedCategoryId,
+          paymentMethod: _paymentMethod,
+        );
+      }
+    } else {
+      // Edição normal (não recorrente)
+      await db.transactionDao.updateTransactionById(
+        id: t.id,
+        description: _descriptionController.text,
+        amount: amount,
+        date: _selectedDate,
+        categoryId: _selectedCategoryId,
+        paymentMethod: _paymentMethod,
+      );
+    }
 
     if (mounted) Navigator.pop(context);
   }
@@ -77,14 +138,42 @@ class _EditTransactionScreenState
   @override
   Widget build(BuildContext context) {
     final categoriesAsync = ref.watch(categoriesProvider);
+    final isRecurring = widget.transaction.isRecurring;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Editar gasto')),
+      appBar: AppBar(
+        title: Text(isRecurring ? 'Editar recorrente' : 'Editar gasto'),
+      ),
       body: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            // Banner informativo para recorrentes
+            if (isRecurring)
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blueAccent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blueAccent.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.repeat, color: Colors.blueAccent, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Transação recorrente — ${widget.transaction.installmentNumber}/${widget.transaction.totalInstallments}',
+                        style: const TextStyle(
+                            color: Colors.blueAccent, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             TextFormField(
               controller: _descriptionController,
               decoration: const InputDecoration(
@@ -113,18 +202,23 @@ class _EditTransactionScreenState
               },
             ),
             const SizedBox(height: 16),
-            InkWell(
-              onTap: _pickDate,
-              child: InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: 'Data',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.calendar_today),
+
+            // Data só editável para transações não recorrentes
+            if (!isRecurring)
+              InkWell(
+                onTap: _pickDate,
+                child: InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: 'Data',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.calendar_today),
+                  ),
+                  child:
+                      Text(DateFormat('dd/MM/yyyy').format(_selectedDate)),
                 ),
-                child: Text(DateFormat('dd/MM/yyyy').format(_selectedDate)),
               ),
-            ),
-            const SizedBox(height: 16),
+            if (!isRecurring) const SizedBox(height: 16),
+
             DropdownButtonFormField<String>(
               value: _paymentMethod,
               decoration: const InputDecoration(
@@ -139,34 +233,39 @@ class _EditTransactionScreenState
             ),
             const SizedBox(height: 16),
             categoriesAsync.when(
-              data: (cats) => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Categoria',
-                      style: Theme.of(context).textTheme.titleSmall),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: cats.map((cat) {
-                      final isSelected = _selectedCategoryId == cat.id;
-                      final color = hexToColor(cat.color);
-                      return FilterChip(
-                        selected: isSelected,
-                        label: Text(cat.name),
-                        avatar: Icon(
-                          categoryIcons[cat.icon] ?? Icons.category,
-                          size: 16,
-                          color: isSelected ? Colors.white : color,
-                        ),
-                        selectedColor: color,
-                        onSelected: (_) =>
-                            setState(() => _selectedCategoryId = cat.id),
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ),
+              data: (cats) {
+                final isExpense = widget.transaction.isExpense;
+                final filtered =
+                    cats.where((c) => c.isExpense == isExpense).toList();
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Categoria',
+                        style: Theme.of(context).textTheme.titleSmall),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: filtered.map((cat) {
+                        final isSelected = _selectedCategoryId == cat.id;
+                        final color = hexToColor(cat.color);
+                        return FilterChip(
+                          selected: isSelected,
+                          label: Text(cat.name),
+                          avatar: Icon(
+                            categoryIcons[cat.icon] ?? Icons.category,
+                            size: 16,
+                            color: isSelected ? Colors.white : color,
+                          ),
+                          selectedColor: color,
+                          onSelected: (_) =>
+                              setState(() => _selectedCategoryId = cat.id),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                );
+              },
               loading: () => const CircularProgressIndicator(),
               error: (e, _) => Text('Erro: $e'),
             ),
