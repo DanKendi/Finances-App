@@ -257,62 +257,6 @@ class HistoryScreen extends ConsumerWidget {
   }
 }
 
-class _BalanceCard extends StatelessWidget {
-  final double balance;
-  const _BalanceCard({required this.balance});
-
-  @override
-  Widget build(BuildContext context) {
-    final isPositive = balance >= 0;
-    final color = isPositive ? Colors.greenAccent.shade400 : Colors.redAccent;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isPositive
-              ? [const Color(0xFF1a3a2a), const Color(0xFF0d2118)]
-              : [const Color(0xFF3a1a1a), const Color(0xFF210d0d)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                isPositive ? Icons.trending_up : Icons.trending_down,
-                color: color,
-                size: 18,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                'Saldo total',
-                style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '${isPositive ? '+' : ''}${formatCurrency(balance)}',
-            style: TextStyle(
-              color: color,
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              letterSpacing: -0.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _MonthlyBalanceCard extends ConsumerWidget {
   const _MonthlyBalanceCard();
 

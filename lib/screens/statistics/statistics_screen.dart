@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
 import '../../utils/providers.dart';
 import '../../utils/formatters.dart';
 import '../../utils/constants.dart';
@@ -213,6 +214,149 @@ class StatisticsScreen extends ConsumerWidget {
             },
             loading: () =>
                 const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Text('Erro: $e'),
+          ),
+
+          // Comparativo mês a mês
+          const SizedBox(height: 16),
+          ref.watch(monthlyComparisonProvider).when(
+            data: (summaries) {
+              if (summaries.every((s) => s.expenses == 0 && s.income == 0)) {
+                return const SizedBox();
+              }
+
+              final maxValue = summaries.fold(0.0, (max, s) {
+                final highest = s.expenses > s.income ? s.expenses : s.income;
+                return highest > max ? highest : max;
+              });
+
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Comparativo 6 meses',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      // Legenda
+                      Row(
+                        children: [
+                          Container(width: 12, height: 12,
+                              decoration: BoxDecoration(
+                                color: Colors.redAccent,
+                                borderRadius: BorderRadius.circular(3),
+                              )),
+                          const SizedBox(width: 4),
+                          const Text('Gastos', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                          const SizedBox(width: 12),
+                          Container(width: 12, height: 12,
+                              decoration: BoxDecoration(
+                                color: Colors.greenAccent.shade700,
+                                borderRadius: BorderRadius.circular(3),
+                              )),
+                          const SizedBox(width: 4),
+                          const Text('Receitas', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        height: 200,
+                        child: BarChart(
+                          BarChartData(
+                            maxY: maxValue * 1.2,
+                            gridData: FlGridData(
+                              show: true,
+                              drawVerticalLine: false,
+                              getDrawingHorizontalLine: (value) => FlLine(
+                                color: Colors.grey.withOpacity(0.15),
+                                strokeWidth: 1,
+                              ),
+                            ),
+                            borderData: FlBorderData(show: false),
+                            titlesData: FlTitlesData(
+                              leftTitles: const AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                              rightTitles: const AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                              topTitles: const AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                              bottomTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  getTitlesWidget: (value, meta) {
+                                    final index = value.toInt();
+                                    if (index < 0 || index >= summaries.length) {
+                                      return const SizedBox();
+                                    }
+                                    final month = summaries[index].month;
+                                    return Padding(
+                                      padding: const EdgeInsets.only(top: 8),
+                                      child: Text(
+                                        DateFormat('MMM', 'pt_BR').format(month),
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                            barGroups: List.generate(summaries.length, (i) {
+                              final s = summaries[i];
+                              return BarChartGroupData(
+                                x: i,
+                                barRods: [
+                                  BarChartRodData(
+                                    toY: s.expenses,
+                                    color: Colors.redAccent,
+                                    width: 10,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  BarChartRodData(
+                                    toY: s.income,
+                                    color: Colors.greenAccent.shade700,
+                                    width: 10,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ],
+                                barsSpace: 4,
+                              );
+                            }),
+                            barTouchData: BarTouchData(
+                              touchTooltipData: BarTouchTooltipData(
+                                getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                                  final s = summaries[group.x];
+                                  final isExpense = rodIndex == 0;
+                                  return BarTooltipItem(
+                                    '${isExpense ? 'Gastos' : 'Receitas'}\n${formatCurrency(rod.toY)}',
+                                    TextStyle(
+                                      color: isExpense
+                                          ? Colors.redAccent
+                                          : Colors.greenAccent.shade400,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+            loading: () => const SizedBox(),
             error: (e, _) => Text('Erro: $e'),
           ),
 

@@ -73,3 +73,49 @@ final monthlyBalanceProvider = Provider<AsyncValue<double>>((ref) {
     return balance;
   });
 });
+
+// Dados dos últimos 6 meses para o comparativo
+final monthlyComparisonProvider = StreamProvider<List<MonthSummary>>((ref) {
+  final db = ref.watch(databaseProvider);
+  return db.transactionDao.watchAllTransactions().map((transactions) {
+    final now = DateTime.now();
+    final summaries = <MonthSummary>[];
+
+    for (int i = 5; i >= 0; i--) {
+      final month = DateTime(now.year, now.month - i, 1);
+      final nextMonth = DateTime(now.year, now.month - i + 1, 1);
+
+      final monthTransactions = transactions.where((t) =>
+          t.date.isAfter(month.subtract(const Duration(seconds: 1))) &&
+          t.date.isBefore(nextMonth));
+
+      final expenses = monthTransactions
+          .where((t) => t.isExpense)
+          .fold(0.0, (sum, t) => sum + t.amount);
+
+      final income = monthTransactions
+          .where((t) => !t.isExpense)
+          .fold(0.0, (sum, t) => sum + t.amount);
+
+      summaries.add(MonthSummary(
+        month: month,
+        expenses: expenses,
+        income: income,
+      ));
+    }
+
+    return summaries;
+  });
+});
+
+class MonthSummary {
+  final DateTime month;
+  final double expenses;
+  final double income;
+
+  MonthSummary({
+    required this.month,
+    required this.expenses,
+    required this.income,
+  });
+}
