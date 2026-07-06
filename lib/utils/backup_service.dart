@@ -4,7 +4,6 @@ import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import '../database/app_database.dart';
-import '../database/daos/transaction_dao.dart';
 
 class BackupService {
   final AppDatabase db;

@@ -1,7 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../database/app_database.dart';
-import '../database/daos/transaction_dao.dart';
-import '../database/daos/category_dao.dart';
 import '../main.dart';
 
 // Provider do mês/ano selecionado — começa no mês atual
@@ -51,5 +49,27 @@ final expensesByCategoryProvider = Provider<AsyncValue<Map<int, double>>>((ref) 
       map[t.categoryId] = (map[t.categoryId] ?? 0) + t.amount;
     }
     return map;
+  });
+});
+
+// Receita total do mês selecionado
+final monthlyIncomeProvider = Provider<AsyncValue<double>>((ref) {
+  final transactions = ref.watch(transactionsByMonthProvider);
+  return transactions.whenData(
+    (list) => list
+        .where((t) => !t.isExpense)
+        .fold(0.0, (sum, t) => sum + t.amount),
+  );
+});
+
+// Saldo do mês selecionado (receitas - gastos)
+final monthlyBalanceProvider = Provider<AsyncValue<double>>((ref) {
+  final transactions = ref.watch(transactionsByMonthProvider);
+  return transactions.whenData((list) {
+    double balance = 0;
+    for (final t in list) {
+      balance += t.isExpense ? -t.amount : t.amount;
+    }
+    return balance;
   });
 });

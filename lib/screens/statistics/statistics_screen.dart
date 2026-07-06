@@ -220,41 +220,39 @@ class StatisticsScreen extends ConsumerWidget {
 
           // Lista de gastos do mês
           transactionsAsync.when(
-            data: (transactions) {
-              if (transactions.isEmpty) return const SizedBox();
-              return Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Transações do mês',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      ...transactions.map((t) => Padding(
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 4),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                    child: Text(t.description,
-                                        overflow:
-                                            TextOverflow.ellipsis)),
-                                Text(
-                                  formatCurrency(t.amount),
-                                  style: const TextStyle(
-                                      color: Colors.redAccent),
-                                ),
-                              ],
-                            ),
-                          )),
-                    ],
-                  ),
+          data: (transactions) {
+            final expenses = transactions.where((t) => t.isExpense).toList();
+            if (expenses.isEmpty) return const SizedBox();
+            return Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Gastos do mês',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    ...expenses.map((t) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                  child: Text(t.description,
+                                      overflow: TextOverflow.ellipsis)),
+                              Text(
+                                formatCurrency(t.amount),
+                                style: const TextStyle(color: Colors.redAccent),
+                              ),
+                            ],
+                          ),
+                        )),
+                  ],
                 ),
-              );
-            },
+              ),
+            );
+          },
             loading: () => const SizedBox(),
             error: (e, _) => Text('Erro: $e'),
           ),

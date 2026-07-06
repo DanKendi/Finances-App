@@ -4,8 +4,8 @@ import '../../utils/providers.dart';
 import '../../utils/formatters.dart';
 import '../../utils/constants.dart';
 import '../../database/app_database.dart';
-import '../add_transaction/edit_transaction_screen.dart';
 import '../../main.dart';
+import '../add_transaction/edit_transaction_screen.dart';
 
 class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({super.key});
@@ -18,7 +18,7 @@ class HistoryScreen extends ConsumerWidget {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Deletar gasto'),
+        title: const Text('Deletar transação'),
         content: Text('Deseja deletar "${t.description}"?'),
         actions: [
           TextButton(
@@ -42,149 +42,207 @@ class HistoryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final transactionsAsync = ref.watch(allTransactionsProvider);
+    final transactionsAsync = ref.watch(transactionsByMonthProvider);
     final categoriesAsync = ref.watch(categoriesProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Histórico'),
-        centerTitle: false,
-      ),
       body: categoriesAsync.when(
         data: (categories) {
           final categoryMap = {for (final c in categories) c.id: c};
 
           return transactionsAsync.when(
             data: (transactions) {
-              if (transactions.isEmpty) {
-                return const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.receipt_long_outlined,
-                          size: 64, color: Colors.grey),
-                      SizedBox(height: 16),
-                      Text(
-                        'Nenhum gasto registrado ainda.',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                );
-              }
-
               final grouped = <String, List<Transaction>>{};
               for (final t in transactions) {
                 final key = formatDate(t.date);
                 grouped.putIfAbsent(key, () => []).add(t);
               }
 
-              return ListView.builder(
-                padding: const EdgeInsets.only(bottom: 100),
-                itemCount: grouped.length,
-                itemBuilder: (context, index) {
-                  final dateKey = grouped.keys.elementAt(index);
-                  final dayTransactions = grouped[dateKey]!;
-                  final dayTotal = dayTransactions
-                      .where((t) => t.isExpense)
-                      .fold(0.0, (sum, t) => sum + t.amount);
+              return CustomScrollView(
+                slivers: [
+                  // Header com saldo
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 56, 16, 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Histórico',
+                            style: Theme.of(context).textTheme.headlineSmall,
+                          ),
+                          const SizedBox(height: 16),
+                          _MonthlyBalanceCard(),
+                        ],
+                      ),
+                    ),
+                  ),
 
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  if (transactions.isEmpty)
+                    const SliverFillRemaining(
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
+                            Icon(Icons.receipt_long_outlined,
+                                size: 64, color: Colors.grey),
+                            SizedBox(height: 16),
                             Text(
-                              dateKey,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleSmall
-                                  ?.copyWith(color: Colors.grey),
-                            ),
-                            Text(
-                              formatCurrency(dayTotal),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleSmall
-                                  ?.copyWith(color: Colors.redAccent),
+                              'Nenhuma transação registrada ainda.',
+                              style: TextStyle(color: Colors.grey),
                             ),
                           ],
                         ),
                       ),
-                      ...dayTransactions.map((t) {
-                        final category = categoryMap[t.categoryId];
-                        final color = category != null
-                            ? hexToColor(category.color)
-                            : Colors.grey;
-                        final icon = category != null
-                            ? (categoryIcons[category.icon] ?? Icons.category)
-                            : Icons.category;
+                    )
+                  else
+                    SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          if (index == grouped.length) {
+                            return const SizedBox(height: 100);
+                          }
+                          final dateKey = grouped.keys.elementAt(index);
+                          final dayTransactions = grouped[dateKey]!;
+                          final dayExpenses = dayTransactions
+                              .where((t) => t.isExpense)
+                              .fold(0.0, (sum, t) => sum + t.amount);
+                          final dayIncome = dayTransactions
+                              .where((t) => !t.isExpense)
+                              .fold(0.0, (sum, t) => sum + t.amount);
 
-                        return Card(
-                          margin: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 4),
-                          child: ListTile(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      EditTransactionScreen(transaction: t),
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      dateKey,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall
+                                          ?.copyWith(color: Colors.grey),
+                                    ),
+                                    Row(
+                                      children: [
+                                        if (dayIncome > 0)
+                                          Text(
+                                            '+${formatCurrency(dayIncome)}',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleSmall
+                                                ?.copyWith(
+                                                    color: Colors.greenAccent
+                                                        .shade400),
+                                          ),
+                                        if (dayIncome > 0 && dayExpenses > 0)
+                                          const Text('  '),
+                                        if (dayExpenses > 0)
+                                          Text(
+                                            '-${formatCurrency(dayExpenses)}',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleSmall
+                                                ?.copyWith(
+                                                    color: Colors.redAccent),
+                                          ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
-                              );
-                            },
-                            onLongPress: () =>
-                                _confirmDelete(context, ref, t),
-                            leading: CircleAvatar(
-                              backgroundColor: color.withOpacity(0.2),
-                              child: Icon(icon, color: color, size: 20),
-                            ),
-                            title: Text(t.description),
-                            subtitle: Row(
-                              children: [
-                                if (category != null)
-                                  Text(
-                                    category.name,
-                                    style: TextStyle(
-                                        color: color, fontSize: 12),
+                              ),
+                              ...dayTransactions.map((t) {
+                                final category = categoryMap[t.categoryId];
+                                final color = category != null
+                                    ? hexToColor(category.color)
+                                    : Colors.grey;
+                                final icon = category != null
+                                    ? (categoryIcons[category.icon] ??
+                                        Icons.category)
+                                    : Icons.category;
+
+                                return Card(
+                                  margin: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 4),
+                                  child: ListTile(
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            EditTransactionScreen(
+                                                transaction: t),
+                                      ),
+                                    ),
+                                    onLongPress: () =>
+                                        _confirmDelete(context, ref, t),
+                                    leading: CircleAvatar(
+                                      backgroundColor:
+                                          color.withOpacity(0.2),
+                                      child:
+                                          Icon(icon, color: color, size: 20),
+                                    ),
+                                    title: Text(t.description),
+                                    subtitle: Row(
+                                      children: [
+                                        if (category != null)
+                                          Text(
+                                            category.name,
+                                            style: TextStyle(
+                                                color: color, fontSize: 12),
+                                          ),
+                                        if (t.totalInstallments != null) ...[
+                                          const Text(' · ',
+                                              style: TextStyle(
+                                                  color: Colors.grey)),
+                                          Icon(
+                                            t.isRecurring
+                                                ? Icons.repeat
+                                                : Icons.credit_card,
+                                            size: 11,
+                                            color: Colors.grey,
+                                          ),
+                                          const SizedBox(width: 2),
+                                          Text(
+                                            '${t.installmentNumber}/${t.totalInstallments}x',
+                                            style: const TextStyle(
+                                                color: Colors.grey,
+                                                fontSize: 12),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          '${t.isExpense ? '-' : '+'}${formatCurrency(t.amount)}',
+                                          style: TextStyle(
+                                            color: t.isExpense
+                                                ? Colors.redAccent
+                                                : Colors.greenAccent.shade400,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        const Icon(Icons.chevron_right,
+                                            color: Colors.grey, size: 16),
+                                      ],
+                                    ),
                                   ),
-                                if (t.totalInstallments != null) ...[
-                                  const Text(' · ',
-                                      style: TextStyle(color: Colors.grey)),
-                                  Text(
-                                    '${t.installmentNumber}/${t.totalInstallments}x',
-                                    style: const TextStyle(
-                                        color: Colors.grey, fontSize: 12),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  formatCurrency(t.amount),
-                                  style: TextStyle(
-                                    color: t.isExpense
-                                        ? Colors.redAccent
-                                        : Colors.greenAccent,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                const Icon(Icons.chevron_right,
-                                    color: Colors.grey, size: 16),
-                              ],
-                            ),
-                          ),
-                        );
-                      }),
-                    ],
-                  );
-                },
+                                );
+                              }),
+                            ],
+                          );
+                        },
+                        childCount: grouped.length + 1,
+                      ),
+                    ),
+                ],
               );
             },
             loading: () =>
@@ -194,6 +252,206 @@ class HistoryScreen extends ConsumerWidget {
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Erro: $e')),
+      ),
+    );
+  }
+}
+
+class _BalanceCard extends StatelessWidget {
+  final double balance;
+  const _BalanceCard({required this.balance});
+
+  @override
+  Widget build(BuildContext context) {
+    final isPositive = balance >= 0;
+    final color = isPositive ? Colors.greenAccent.shade400 : Colors.redAccent;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isPositive
+              ? [const Color(0xFF1a3a2a), const Color(0xFF0d2118)]
+              : [const Color(0xFF3a1a1a), const Color(0xFF210d0d)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isPositive ? Icons.trending_up : Icons.trending_down,
+                color: color,
+                size: 18,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Saldo total',
+                style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${isPositive ? '+' : ''}${formatCurrency(balance)}',
+            style: TextStyle(
+              color: color,
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              letterSpacing: -0.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MonthlyBalanceCard extends ConsumerWidget {
+  const _MonthlyBalanceCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selectedMonth = ref.watch(selectedMonthProvider);
+    final monthlyTotal = ref.watch(monthlyTotalProvider);
+    final monthlyIncome = ref.watch(monthlyIncomeProvider);
+    final monthlyBalance = ref.watch(monthlyBalanceProvider);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceVariant,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Seletor de mês
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                onPressed: () {
+                  ref.read(selectedMonthProvider.notifier).state = DateTime(
+                    selectedMonth.year,
+                    selectedMonth.month - 1,
+                  );
+                },
+                icon: const Icon(Icons.chevron_left),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+              Text(
+                formatMonth(selectedMonth),
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              IconButton(
+                onPressed: () {
+                  ref.read(selectedMonthProvider.notifier).state = DateTime(
+                    selectedMonth.year,
+                    selectedMonth.month + 1,
+                  );
+                },
+                icon: const Icon(Icons.chevron_right),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+          const Divider(height: 20),
+
+          // Receitas, Gastos e Saldo
+          Row(
+            children: [
+              // Receitas
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Receitas',
+                        style: TextStyle(
+                            color: Colors.grey.shade400, fontSize: 12)),
+                    const SizedBox(height: 4),
+                    monthlyIncome.when(
+                      data: (v) => Text(
+                        '+${formatCurrency(v)}',
+                        style: TextStyle(
+                          color: Colors.greenAccent.shade400,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                      loading: () => const SizedBox(),
+                      error: (e, _) => const SizedBox(),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Gastos
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Gastos',
+                        style: TextStyle(
+                            color: Colors.grey.shade400, fontSize: 12)),
+                    const SizedBox(height: 4),
+                    monthlyTotal.when(
+                      data: (v) => Text(
+                        '-${formatCurrency(v)}',
+                        style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                      loading: () => const SizedBox(),
+                      error: (e, _) => const SizedBox(),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Saldo
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Saldo',
+                        style: TextStyle(
+                            color: Colors.grey.shade400, fontSize: 12)),
+                    const SizedBox(height: 4),
+                    monthlyBalance.when(
+                      data: (v) {
+                        final isPositive = v >= 0;
+                        return Text(
+                          '${isPositive ? '+' : ''}${formatCurrency(v)}',
+                          style: TextStyle(
+                            color: isPositive
+                                ? Colors.greenAccent.shade400
+                                : Colors.redAccent,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        );
+                      },
+                      loading: () => const SizedBox(),
+                      error: (e, _) => const SizedBox(),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

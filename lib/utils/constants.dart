@@ -11,6 +11,11 @@ const Map<String, IconData> categoryIcons = {
   'clothing': Icons.checkroom,
   'bills': Icons.receipt,
   'other': Icons.category,
+  'salary': Icons.work,
+  'gift': Icons.card_giftcard,
+  'charge': Icons.request_page,
+  'freelance': Icons.laptop,
+  'investment': Icons.trending_up,
 };
 
 // Converte a string hex salva no banco para Color do Flutter
