@@ -6,34 +6,41 @@ import 'package:path/path.dart' as p;
 import '../models/category.dart';
 import '../models/transaction.dart';
 import '../models/installment_purchase.dart';
+import '../models/budget.dart';
+import '../models/wish_item.dart';
 import 'daos/category_dao.dart';
 import 'daos/transaction_dao.dart';
+import 'daos/budget_dao.dart';
+import 'daos/wish_dao.dart';
 
 part 'app_database.g.dart';
 
 @DriftDatabase(
-  tables: [Categories, Transactions, InstallmentPurchases],
-  daos: [CategoryDao, TransactionDao],
+  tables: [Categories, Transactions, InstallmentPurchases, Budgets, WishItems],
+  daos: [CategoryDao, TransactionDao, BudgetDao, WishDao],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 2;
-    
+  int get schemaVersion => 3;
 
   @override
-    MigrationStrategy get migration => MigrationStrategy(
-      onCreate: (m) async {
-        await m.createAll();
-        await _insertDefaultCategories();
-      },
-      onUpgrade: (m, from, to) async {
-        if (from < 2) {
-          await m.addColumn(transactions, transactions.isRecurring);
-        }
-      },
-  );
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) async {
+          await m.createAll();
+          await _insertDefaultCategories();
+        },
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.addColumn(transactions, transactions.isRecurring);
+          }
+          if (from < 3) {
+            await m.createTable(budgets);
+            await m.createTable(wishItems);
+          }
+        },
+      );
 
   Future<void> _insertDefaultCategories() async {
     final defaults = [

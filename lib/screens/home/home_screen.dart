@@ -4,6 +4,9 @@ import '../history/history_screen.dart';
 import '../statistics/statistics_screen.dart';
 import '../add_transaction/add_transaction_screen.dart';
 import '../backup/backup_screen.dart';
+import '../budget/budget_screen.dart';
+import '../wishes/wish_screen.dart';
+
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -18,6 +21,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final List<Widget> _screens = const [
     HistoryScreen(),
     StatisticsScreen(),
+    BudgetScreen(),
+    WishScreen(),
   ];
 
   @override
@@ -40,33 +45,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             selectedIcon: Icon(Icons.pie_chart),
             label: 'Estatísticas',
           ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const AddTransactionScreen(),
-            ),
-          );
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('Adicionar'),
-      ),
-
-      appBar: AppBar(
-        title: const Text('Finanças'),
-        actions: [
-          IconButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const BackupScreen()),
-              );
-            },
-            icon: const Icon(Icons.backup),
-            tooltip: 'Backup',
+          NavigationDestination(
+            icon: Icon(Icons.track_changes_outlined),
+            selectedIcon: Icon(Icons.track_changes),
+            label: 'Metas',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.star_outline),
+            selectedIcon: Icon(Icons.star),
+            label: 'Desejos',
           ),
         ],
       ),

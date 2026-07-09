@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../database/app_database.dart';
 import '../main.dart';
+import '../database/app_database.dart';
 
 // Provider do mês/ano selecionado — começa no mês atual
 final selectedMonthProvider = StateProvider<DateTime>((ref) {
@@ -119,3 +120,25 @@ class MonthSummary {
     required this.income,
   });
 }
+
+// Providers de metas
+final budgetsProvider = StreamProvider<List<Budget>>((ref) {
+  final db = ref.watch(databaseProvider);
+  return db.budgetDao.watchAllBudgets();
+});
+
+// Renda total do mês selecionado (base para calcular percentuais)
+final monthlyIncomeBaseProvider = Provider<AsyncValue<double>>((ref) {
+  final transactions = ref.watch(transactionsByMonthProvider);
+  return transactions.whenData(
+    (list) => list
+        .where((t) => !t.isExpense)
+        .fold(0.0, (sum, t) => sum + t.amount),
+  );
+});
+
+// Providers de desejos
+final wishItemsProvider = StreamProvider<List<WishItem>>((ref) {
+  final db = ref.watch(databaseProvider);
+  return db.wishDao.watchAllWishItems();
+});

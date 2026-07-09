@@ -6,6 +6,7 @@ import '../../utils/constants.dart';
 import '../../database/app_database.dart';
 import '../../main.dart';
 import '../add_transaction/edit_transaction_screen.dart';
+import '../add_transaction/add_transaction_screen.dart';
 
 class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({super.key});
@@ -46,6 +47,18 @@ class HistoryScreen extends ConsumerWidget {
     final categoriesAsync = ref.watch(categoriesProvider);
 
     return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const AddTransactionScreen(),
+            ),
+          );
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Adicionar'),
+      ),
       body: categoriesAsync.when(
         data: (categories) {
           final categoryMap = {for (final c in categories) c.id: c};

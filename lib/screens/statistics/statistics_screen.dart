@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../utils/providers.dart';
 import '../../utils/formatters.dart';
 import '../../utils/constants.dart';
+import '../add_transaction/add_transaction_screen.dart';
 
 class StatisticsScreen extends ConsumerWidget {
   const StatisticsScreen({super.key});
@@ -21,6 +22,18 @@ class StatisticsScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Estatísticas'),
         centerTitle: false,
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const AddTransactionScreen(),
+            ),
+          );
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Adicionar'),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
