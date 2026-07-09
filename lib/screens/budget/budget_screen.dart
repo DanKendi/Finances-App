@@ -29,7 +29,7 @@ class BudgetScreen extends ConsumerWidget {
       ),
       body: categoriesAsync.when(
         data: (categories) {
-          final expenseCats = categories.where((c) => c.isExpense).toList();
+          //final expenseCats = categories.where((c) => c.isExpense).toList();
           final categoryMap = {for (final c in categories) c.id: c};
 
           return budgetsAsync.when(

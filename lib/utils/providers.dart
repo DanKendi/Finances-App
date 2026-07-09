@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../database/app_database.dart';
 import '../main.dart';
-import '../database/app_database.dart';
 
 // Provider do mês/ano selecionado — começa no mês atual
 final selectedMonthProvider = StateProvider<DateTime>((ref) {

@@ -346,7 +346,6 @@ class StatisticsScreen extends ConsumerWidget {
                             barTouchData: BarTouchData(
                               touchTooltipData: BarTouchTooltipData(
                                 getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                                  final s = summaries[group.x];
                                   final isExpense = rodIndex == 0;
                                   return BarTooltipItem(
                                     '${isExpense ? 'Gastos' : 'Receitas'}\n${formatCurrency(rod.toY)}',

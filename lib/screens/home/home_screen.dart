@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../history/history_screen.dart';
 import '../statistics/statistics_screen.dart';
-import '../add_transaction/add_transaction_screen.dart';
-import '../backup/backup_screen.dart';
 import '../budget/budget_screen.dart';
 import '../wishes/wish_screen.dart';
 
